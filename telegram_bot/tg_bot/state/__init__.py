@@ -1,1 +1,1 @@
-from .lowprice_state import LowPrice
+from .lowprice_state import LowPrice, ClientStatesGroup, ProfileStatesGroup

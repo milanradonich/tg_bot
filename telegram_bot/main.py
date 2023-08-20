@@ -1,138 +1,380 @@
 import logging
-import os
+import datetime
 
-from aiogram import Dispatcher
-from aiogram.utils.executor import start_polling, start_webhook
-from loguru import logger
+import aiogram_calendar
+from aiogram.types import BotCommand, CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup,\
+    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.utils.callback_data import CallbackData
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters import Text
+from aiogram_calendar import simple_cal_callback, SimpleCalendar, dialog_cal_callback, DialogCalendar
 
-# from tg_bot.filters.admin import IsAdminFilter
-from tg_bot.middlewares.throttling import ThrottlingMiddleware
-# from tg_bot.services.admins_notify import on_startup_notify
-from tg_bot.services.setting_commands import set_default_commands
-from loader import dp
+from config import API_TOKEN
+from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
+from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
+from tg_bot.DB.SQlite import db_start, create_profile, edit_profile
 
 
-# def register_all_middlewares(dispatcher: Dispatcher) -> None:
-#     logger.info('Registering middlewares')
-#     dispatcher.setup_middleware(ThrottlingMiddleware())
+logging.basicConfig(level=logging.INFO)
+
+cb = CallbackData('inline_kb', 'action')  # pattern # коллбек кнопки
+storage = MemoryStorage()
+bot = Bot(token=API_TOKEN)  # создаем экземпляр бота, подключаемся к API
+dp = Dispatcher(bot=bot,
+                storage=storage)
+
+
+async def set_default_commands(dp) -> None:
+    commands = [
+        BotCommand(command='start', description='Start the bot'),
+        BotCommand(command='help', description='Show all commands'),
+        BotCommand(command='lowprice', description='Must lower value')
+        # BotCommand(command='custom', description='Custom setting search'),
+        # BotCommand(command='history', description='Request history'),
+        # BotCommand(command='photo', description='Get photo'),
+        # BotCommand(command='create', description='new profile')
+    ]
+    await dp.bot.set_my_commands(commands=commands)
+
+
+# коллбек кнопки
+def get_inline() -> InlineKeyboardMarkup:
+    inline_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton('Button1', callback_data=cb.new('push_1'))],
+        [InlineKeyboardButton('Button2', callback_data=cb.new('push_2'))]
+    ])
+
+    return inline_kb
+
+
+# кнопка для FSM
+def get_keyboard() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(KeyboardButton('Начать работу!'))
+    return kb
+
+
+def get_cancel() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton('/cancel'))
+# Конец
+
+
+start_kb = ReplyKeyboardMarkup(resize_keyboard=True,)
+start_kb.row('Navigation Calendar', 'Dialog Calendar')
+
+
+async def on_startup(dp):
+    print('Загружаем команды...')
+    await set_default_commands(dp)
+    print('Загружаем базу данных')
+    await db_start()
+    print('Бот успешно запущен!')
+
+
+HELP_CMD = """"
+<b>/help</b> - <em>список команд</em>
+<b>/start</b> - <em>начать работу с ботом</em>
+<b>/lowprice</b> - <em>начать работу с ботом</em>
+"""
+
+
+@dp.message_handler(commands=['cancel'], state='*')
+async def cmd_stop(message: types.Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state is None:
+        return
+
+    await message.reply('Галя, отмена!')
+    await state.finish()
+
+
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message) -> None:
+    user_name = message.from_user.full_name
+    await message.reply(f"Привет, {user_name}!\nДобро пожаловать в бот-путешественник.\n"
+                        f"Я помогу тебе найти жилье в разных странах и городах.")
+
+    await create_profile(user_id=message.from_user.id)  # создается профиль юзера
+    await message.delete()
+
+
+@dp.message_handler(commands=['lowprice'])
+async def city_input(message: types.Message) -> None:
+    await message.reply('Давайте начнем поиск. Введите название города',
+                        reply_markup=get_cancel())
+    await LowPrice.city.set()
+
+
+@dp.message_handler(state=LowPrice.city)
+async def load_city(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['city'] = message.text
+
+    await message.answer("Выберите дату заезда",
+                         reply_markup=await SimpleCalendar().start_calendar())
+    await LowPrice.date_of_entry.set()
+
+
+@dp.callback_query_handler(simple_cal_callback.filter(), state=LowPrice.date_of_entry)
+async def process_simple_calendar(callback_query: CallbackQuery, callback_data: dict, state: FSMContext):
+    selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
+    if selected:
+        await callback_query.message.answer(
+            f'Дата заезда {date.strftime("%d/%m/%Y")}')
+        await state.update_data(date_of_entry=datetime.datetime.strptime(date.strftime("%Y%m%d"), "%Y%m%d").date())
+        await callback_query.message.answer('Выберите дату выезда',
+                                            reply_markup=await SimpleCalendar().start_calendar())
+        await LowPrice.departure_date.set()
+
+
+@dp.callback_query_handler(simple_cal_callback.filter(), state=LowPrice.departure_date)
+async def process_simple_calendar(callback_query: CallbackQuery, callback_data: dict, state: FSMContext):
+    selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
+    if selected:
+        await callback_query.message.answer(
+            f'Дата выезда {date.strftime("%d/%m/%Y")}')
+        await state.update_data(departure_date=datetime.datetime.strptime(date.strftime("%Y%m%d"), "%Y%m%d").date())
+        await callback_query.message.answer('Сколько отелей показать? (от 1 до 5)')
+        await LowPrice.quantity_hotels.set()
+
+
+@dp.message_handler(state=LowPrice.quantity_hotels)
+async def load_quantity_hotels(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['quantity_hotels'] = message.text
+
+    await message.answer('Нужно показать фото отелей?', reply_markup=photo_hotel)
+    await message.delete()
+    await LowPrice.photo.set()
+
+
+@dp.message_handler(Text(equals='НЕТ 🚫️'), state=LowPrice.photo)
+async def send_result_without_photo(message: types.Message, state: FSMContext):
+    await message.reply('Значит без фото')
+    await message.delete()
+    await state.finish()
+
+
+@dp.message_handler(Text(equals='ДА ☑️'), state=LowPrice.photo)
+async def get_quantity_photo(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['photo'] = message.text
+    await message.answer('Сколько фото показать?', reply_markup=ReplyKeyboardRemove())
+    await LowPrice.quantity_photo.set()
+    await message.delete()
+
+
+@dp.message_handler(state=LowPrice.quantity_photo)
+async def send_result_with_photo(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['quantity_photo'] = message.text
+    await message.reply('Поиск с фото')
+    await state.finish()
+
+
+@dp.message_handler(commands=['help'])
+async def help_command(message: types.Message):
+    await bot.send_message(chat_id=message.from_user.id,
+                           text=HELP_CMD, parse_mode='HTML')  # отправляем список только в личку юзеру
+
+
+@dp.message_handler(content_types=['text'])
+async def echo_handler(message: types.Message):
+    user_name = message.from_user.full_name
+    if message.text.lower() == "привет":
+        await message.reply(f'Привет, {user_name} ! Введите команду')
+    else:
+        await message.reply('Я вас не понял. Введите команду твердо и четко')
+
+
+@dp.message_handler(content_types=types.ContentType.PHOTO)
+async def audio_handler(message: types.Message):
+    await message.reply('Я не ищу отели по фото! Повторите команду.')
+
+
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
+
+
+
+
+# создание анкеты с помощью FSM__________________________________________________________________________
+# @dp.message_handler(commands=['cancel'], state='*')
+# async def cmd_start(message: types.Message, state: FSMContext) -> None:
+#     current_state = await state.get_state()
+#     if current_state is None:
+#         return
+#
+#     await message.reply('Галя, отмена!')
+#     await state.finish()
 #
 #
-# def register_all_filters(dispatcher: Dispatcher) -> None:
-#     logger.info('Registering filters')
-#     dispatcher.filters_factory.bind(IsAdminFilter)
-
-
-def register_all_handlers(dispatcher: Dispatcher) -> None:
-    from tg_bot import handlers
-    logger.info('Registering handlers')
-
-
-async def register_all_commands(dispatcher: Dispatcher) -> None:
-    logger.info('Registering commands')
-    await set_default_commands(dispatcher.bot)
-
-
-async def on_startup(dispatcher: Dispatcher, webhook_url: str = None) -> None:
-    # register_all_middlewares(dispatcher)
-    # register_all_filters(dispatcher)
-    register_all_handlers(dispatcher)
-    await register_all_commands(dispatcher)
-    # # Get current webhook status
-    # webhook = await dispatcher.bot.get_webhook_info()
-    #
-    # if webhook_url:
-    #     await dispatcher.bot.set_webhook(webhook_url)
-    #     logger.info('Webhook was set')
-    # elif webhook.url:
-    #     await dispatcher.bot.delete_webhook()
-    #     logger.info('Webhook was deleted')
-
-    # await on_startup_notify(dispatcher)
-
-    logger.info('Bot started')
-
-
-async def on_shutdown(dispatcher: Dispatcher) -> None:
-    await dispatcher.storage.close()
-    await dispatcher.storage.wait_closed()
-    logger.info('Bot shutdown')
-
-
-if __name__ == "__main__":
-    logger.add(
-        "tgbot.log",
-        format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
-        rotation="10 KB",
-        compression="zip",
-    )
-    logger.info("Initializing bot")
-
-    # # Webhook settings
-    # HEROKU_APP_NAME = os.getenv('HEROKU_APP_NAME')
-    # WEBHOOK_HOST = f'https://{HEROKU_APP_NAME}.herokuapp.com'
-    # WEBHOOK_PATH = f'/webhook/{config.tg_bot.token}'
-    # WEBHOOK_URL = f'{WEBHOOK_HOST}{WEBHOOK_PATH}'
-    # # Webserver settings
-    # WEBAPP_HOST = '0.0.0.0'
-    # WEBAPP_PORT = int(os.getenv('PORT', 5000))
-
-    start_polling(
-        dispatcher=dp,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        skip_updates=True,
-    )
-
-
-
-
-
-
-
-
-
-
-# *********************************************
-# import asyncio
-# import logging
-#
-# from aiogram import Bot, Dispatcher, executor, types
-# from aiogram.types import Message
-# from config import API_TOKEN
+# @dp.message_handler(commands=['create'])
+# async def cmd_create(message: types.Message) -> None:
+#     await message.reply('Давай создадим твой профиль. Для начала отправь мне свое фото',
+#                         reply_markup=get_cancel())
+#     await ProfileStatesGroup.photo.set()    # установка состояние фото. Бот будет ожидать фото от пользователя
 #
 #
-# logging.basicConfig(level=logging.INFO)
-#
-# bot = Bot(token=API_TOKEN)
-# dp = Dispatcher(bot)
-#
-#
-# async def set_default_commands(dp):
-#     await dp.bot.set_my_commands([
-#         types.BotCommand('start', 'welcome descr'),
-#         types.BotCommand('hello-world', 'welcome descr'),
-#         # types.BotCommand('help', ' list of commands'),
-#     ])
+# @dp.message_handler(lambda message: not message.photo, state=ProfileStatesGroup.photo)
+# async def check_photo(message: types.Message):
+#     await message.reply('Это не фотография')
 #
 #
-# @dp.message_handler(commands=['start', 'hello-world'])
+# @dp.message_handler(content_types=['photo'], state=ProfileStatesGroup.photo) # хэндлер обрабатывает входящие фото в состоянии state
+# async def load_photo(message: types.Message, state: FSMContext) -> None:
+#     async with state.proxy() as data:  #  открываем временное хранилище данных
+#         data['photo'] = message.photo[0].file_id    # сохраняем значение фотографии id-фото
+#
+#     await message.reply('Отправь свое имя')
+#     await ProfileStatesGroup.next()   # изменяем состояние на следующее
+#
+#
+# @dp.message_handler(lambda message: not message.text.isdigit() or float(message.text) > 100,
+#                     state=ProfileStatesGroup.age)
+# async def check_photo(message: types.Message):
+#     await message.reply('Введите реальный возраст!')
+#
+#
+# @dp.message_handler(state=ProfileStatesGroup.name)
+# async def load_name(message: types.Message, state: FSMContext) -> None:
+#     async with state.proxy() as data:  #  открываем временное хранилище данных
+#         data['name'] = message.text   # сохраняем значение name
+#
+#     await message.reply('Сколько тебе лет?')
+#     await ProfileStatesGroup.next()   # изменяем состояние на следующее
+#
+#
+# @dp.message_handler(state=ProfileStatesGroup.age)
+# async def load_age(message: types.Message, state: FSMContext) -> None:
+#     async with state.proxy() as data:  #  открываем временное хранилище данных
+#         data['age'] = message.text   # сохраняем значение age
+#
+#     await message.reply('Расскажи немоного о себе')
+#     await ProfileStatesGroup.next()   # изменяем состояние на следующее
+#
+#
+# @dp.message_handler(state=ProfileStatesGroup.descr)
+# async def load_descr(message: types.Message, state: FSMContext) -> None:
+#     async with state.proxy() as data:  #  открываем временное хранилище данных
+#         data['descr'] = message.text   # сохраняем значение descr
+#         await bot.send_photo(chat_id=message.from_user.id,
+#                                photo=data['photo'], caption=f"{data['name']}, {data['age']}\n{data['descr']}"
+#                                                             )
+#     await edit_profile(state, user_id=message.from_user.id)
+#     await message.reply('Ваша анкета создана')
+#     await state.finish()   # завершаем состояние
+# конец регистрации
+
+
+# команда обработчик для FSM
+# @dp.message_handler(commands=['start_push'])
+# async def cmd_start(message: types.Message) -> None:
+#     await message.answer('Добро пожаловать',
+#                          reply_markup=get_keyboard())
+#
+#
+# @dp.message_handler(commands=['cancel'], state='*')
+# async def cmd_start(message: types.Message, state: FSMContext) -> None:
+#     current_state = await state.get_state()
+#     if current_state is None:
+#         return
+#
+#     await message.reply('Отменил',
+#                         reply_markup=get_keyboard())
+#     await state.finish()
+#
+#
+# @dp.message_handler(Text(equals='Начать работу!', ignore_case=True), state=None)
+# async def start_work(message: types.Message) -> None:
+#     await ClientStatesGroup.photo.set()
+#     await message.answer('Сначала отправь нам фотографию!',
+#                          reply_markup=get_cancel())
+#
+#
+# @dp.message_handler(lambda message: not message.photo, state=ClientStatesGroup.photo)
+# async def check_photo(message: types.Message):
+#     return await message.reply('Это не фотография!')
+#
+#
+# @dp.message_handler(lambda message: message.photo, content_types=['photo'], state=ClientStatesGroup.photo)
+# async def load_photo(message: types.Message, state: FSMContext):
+#     async with state.proxy() as data:
+#         data['photo'] = message.photo[0].file_id
+#
+#     await ClientStatesGroup.next()
+#     await message.reply('А теперь отправь нам описание!')
+#
+#
+# @dp.message_handler(state=ClientStatesGroup.descr)
+# async def load_photo(message: types.Message, state: FSMContext):
+#     async with state.proxy() as data:
+#         data['descr'] = message.text
+#
+#     await message.reply('Ваша фотография сохранена!')
+#
+#     async with state.proxy() as data:
+#         await bot.send_photo(chat_id=message.from_user.id,
+#                              photo=data['photo'],
+#                              caption=data['descr'])
+#
+#     await state.finish()
+# конец
+
+
+
+
+
+# коллбек кнопки
+# @dp.message_handler(commands=['test'])
 # async def send_welcome(message: types.Message):
-#     user_name = message.from_user.full_name
-#     await message.reply(f"Привет, {user_name}!\nДобро пожаловать в бот-путешественник.\n"
-#                         f"Я помогу тебе найти жилье в разных странах и городах.")
+#     await message.reply(text='Welcome!', reply_markup=get_inline())
 #
 #
-# @dp.message_handler(content_types=['text'])
-# async def text_handler(message: types.Message):
-#     user_name = message.from_user.full_name
-#     if message.text.lower() == "привет":
-#         await message.reply(f'Привет, {user_name} ! Что будем искать?')
-#     else:
-#         await message.reply('Я вас не понял. Введите текст твердо и четко')
+# @dp.callback_query_handler(cb.filter(action='push_1'))
+# async def push_first_cb_handler(callback: types.CallbackQuery) -> None:
+#     await callback.answer('Hello!')
 #
 #
-# async def main():
-#     await dp.start_polling(bot)
+# @dp.callback_query_handler(cb.filter(action='push_2'))
+# async def push_sec_cb_handler(callback: types.CallbackQuery) -> None:
+#     await callback.answer('World!')
+# конец
+
+
+# отправка фоточек
+# @dp.message_handler(commands=['photo'])
+# async def send_image(message: types.Message):
+#     await message.answer(text='Кого отправить?', reply_markup=photo_choice)
+#     await message.delete()
 #
-# if __name__ == '__main__':
-#     asyncio.run(main())
+#
+# @dp.message_handler(Text(equals='Котики'))
+# async def send_cats(message: types.Message):
+#     await bot.send_photo(chat_id=message.from_user.id,
+#                          photo='http://vsesvoi43.ru/wp-content/uploads/2020/09/kogo-zavesti-kota-ili-koshku.jpg',
+#                          caption='Нравится котики?',
+#                          reply_markup=ikb)
+#     await message.delete()
+#
+#
+# @dp.message_handler(Text(equals='Собачки'))
+# async def send_dogs(message: types.Message):
+#     await bot.send_photo(chat_id=message.from_user.id,
+#                          photo='https://klike.net/uploads/posts/2023-01/1675061216_3-25.jpg',
+#                          caption='Нравится собачка?',
+#                          reply_markup=ikb)
+#     await message.delete()
+#
+#
+# @dp.callback_query_handler()
+# async def vote_callback(callback: types.CallbackQuery):
+#     if callback.data == 'like':
+#         await callback.answer(text='Тебе понравились котики!')
+#     await callback.answer(text='Тебе не понравились котики(')
+# # конец
+
+
+
