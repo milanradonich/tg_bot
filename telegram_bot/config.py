@@ -1,1 +1,2 @@
 API_TOKEN = '5468403221:AAGGdk30ishpYwenO3yBTylqGhKpiuP5LY8'
+RAPID_API_KEY = '5621ae9c28mshf6ff4d8afd078fep11e0d1jsn5efeef603c64'
