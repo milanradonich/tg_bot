@@ -1,5 +1,7 @@
 import logging
 import datetime
+import asyncio
+import pprint
 
 from aiogram.types import BotCommand, CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup,\
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
@@ -14,7 +16,7 @@ from config import API_TOKEN
 from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
 from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
 from tg_bot.DB.SQlite import db_start, create_profile, edit_profile
-from hotels_requests import destination_id
+from test_request import destination_id
 
 
 logging.basicConfig(level=logging.INFO)
@@ -113,7 +115,7 @@ async def load_city(message: types.Message, state: FSMContext):
         data['city'] = message.text
 
     city_options = destination_id(data['city'])
-    print(city_options)
+    pprint.pprint(city_options)
 
     await message.answer("Выберите дату заезда",
                          reply_markup=await SimpleCalendar().start_calendar())
