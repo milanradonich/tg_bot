@@ -16,7 +16,7 @@ from config import API_TOKEN
 from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
 from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
 from tg_bot.DB.SQlite import db_start, create_profile, edit_profile
-from test_request import destination_id
+from test_request import destination_id, get_hotel_info_cheap
 
 
 logging.basicConfig(level=logging.INFO)
@@ -114,8 +114,7 @@ async def load_city(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['city'] = message.text
 
-    city_options = destination_id(data['city'])
-    pprint.pprint(city_options)
+    print(destination_id(data['city']))
 
     await message.answer("Выберите дату заезда",
                          reply_markup=await SimpleCalendar().start_calendar())
@@ -158,6 +157,9 @@ async def load_quantity_hotels(message: types.Message, state: FSMContext):
 @dp.message_handler(Text(equals='НЕТ 🚫️'), state=LowPrice.photo)
 async def send_result_without_photo(message: types.Message, state: FSMContext):
     await message.reply('Значит без фото')
+    search_info = {'message': message, 'state': state, 'find_hotel_func_name': get_hotel_info_cheap,
+                              'current_state': 'lowprice'}
+    await send_results_without_photo(search_information=search_information)
     await message.delete()
     await state.finish()
 
