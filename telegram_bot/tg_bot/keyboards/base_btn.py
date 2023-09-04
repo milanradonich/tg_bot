@@ -1,6 +1,7 @@
 from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup,\
     InlineKeyboardButton
 
+
 photo_hotel = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
 btn_yes = KeyboardButton(text='ДА ☑️')
 btn_no = KeyboardButton(text='НЕТ 🚫️')

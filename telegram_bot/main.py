@@ -3,7 +3,7 @@ import datetime
 import asyncio
 import pprint
 
-from aiogram.types import BotCommand, CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup,\
+from aiogram.types import BotCommand, CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup, \
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.utils.callback_data import CallbackData
@@ -13,10 +13,12 @@ from aiogram.dispatcher.filters import Text
 from aiogram_calendar import simple_cal_callback, SimpleCalendar, dialog_cal_callback, DialogCalendar
 
 from config import API_TOKEN
+from typing import Dict
 from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
 from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
 from tg_bot.DB.SQlite import db_start, create_profile, edit_profile
-from test_request import destination_id, get_hotel_info_cheap
+from hotels_requests import destination_id
+
 
 
 logging.basicConfig(level=logging.INFO)
@@ -51,6 +53,13 @@ def get_inline() -> InlineKeyboardMarkup:
     return inline_kb
 
 
+# def get_city_btn(message: Message, possible_city: Dict):
+
+
+
+
+
+
 # кнопка для FSM
 def get_keyboard() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -60,10 +69,12 @@ def get_keyboard() -> ReplyKeyboardMarkup:
 
 def get_cancel() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton('/cancel'))
+
+
 # Конец
 
 
-start_kb = ReplyKeyboardMarkup(resize_keyboard=True,)
+start_kb = ReplyKeyboardMarkup(resize_keyboard=True, )
 start_kb.row('Navigation Calendar', 'Dialog Calendar')
 
 
@@ -114,7 +125,7 @@ async def load_city(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['city'] = message.text
 
-    print(destination_id(data['city']))
+    possible_city = destination_id(data['city'])
 
     await message.answer("Выберите дату заезда",
                          reply_markup=await SimpleCalendar().start_calendar())
@@ -156,10 +167,12 @@ async def load_quantity_hotels(message: types.Message, state: FSMContext):
 
 @dp.message_handler(Text(equals='НЕТ 🚫️'), state=LowPrice.photo)
 async def send_result_without_photo(message: types.Message, state: FSMContext):
-    await message.reply('Значит без фото')
-    search_info = {'message': message, 'state': state, 'find_hotel_func_name': get_hotel_info_cheap,
-                              'current_state': 'lowprice'}
-    await send_results_without_photo(search_information=search_information)
+    await message.reply('Держи без фото')
+    async with state.proxy() as data:
+        city_name = data['city']
+    text = f"Вы выбрали город: {city_name}"
+    await message.answer(text)
+
     await message.delete()
     await state.finish()
 
@@ -203,9 +216,6 @@ async def audio_handler(message: types.Message):
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
-
-
-
 
 # создание анкеты с помощью FSM__________________________________________________________________________
 # @dp.message_handler(commands=['cancel'], state='*')
@@ -331,9 +341,6 @@ if __name__ == '__main__':
 # конец
 
 
-
-
-
 # коллбек кнопки
 # @dp.message_handler(commands=['test'])
 # async def send_welcome(message: types.Message):
@@ -382,6 +389,3 @@ if __name__ == '__main__':
 #         await callback.answer(text='Тебе понравились котики!')
 #     await callback.answer(text='Тебе не понравились котики(')
 # # конец
-
-
-

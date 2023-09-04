@@ -3,6 +3,7 @@ from aiogram.dispatcher.filters.state import StatesGroup, State
 
 # класс состояний юзера, где мы опишем все states, чтобы потом переключаться между ними.
 class LowPrice(StatesGroup):
+    start = State()
     city = State()
     date_of_entry = State()
     departure_date = State()
