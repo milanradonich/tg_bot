@@ -8,9 +8,12 @@ class LowPrice(StatesGroup):
     destinationId = State()
     date_of_entry = State()
     departure_date = State()
+    minPrice = State()
+    maxPrice = State()
+    landmark_in = State()
+    landmark_out = State()
     quantity_hotels = State()
-    photo = State()
-    result_without_photo = State()
+    need_photo = State()
     quantity_photo = State()
 
 

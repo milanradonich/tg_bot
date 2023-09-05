@@ -14,12 +14,12 @@ from aiogram_calendar import simple_cal_callback, SimpleCalendar, dialog_cal_cal
 
 from config import API_TOKEN
 from typing import Dict
+
+from tg_bot.misc.other_func import print_data_without_photo, print_data_with_photo
 from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
 from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
 from tg_bot.DB.SQlite import db_start, create_profile, edit_profile
 from hotels_requests import destination_id
-
-
 
 logging.basicConfig(level=logging.INFO)
 
@@ -128,17 +128,20 @@ async def load_city(message: types.Message, state: FSMContext):
 
     possible_city = destination_id(data['city'])
     await message.answer('Выбери город: ', reply_markup=get_city_btn(possible_city))
-
     await LowPrice.destinationId.set()
 
 
-@dp.message_handler(state=LowPrice.city)
-async def load_city(message: types.Message, state: FSMContext):
+@dp.callback_query_handler(lambda callback_query: True, state=LowPrice.destinationId)
+async def load_city_id(callback_query: types.CallbackQuery, state: FSMContext):
+    city_id = callback_query.data
     async with state.proxy() as data:
-        data['city'] = message.text
-
-    await message.answer("Выберите дату заезда",
-                         reply_markup=await SimpleCalendar().start_calendar())
+        data['destinationId'] = city_id
+    await bot.send_message(callback_query.from_user.id, f"Вы выбрали город: {city_id}!")
+    await bot.edit_message_reply_markup(chat_id=callback_query.message.chat.id,
+                                        message_id=callback_query.message.message_id,
+                                        reply_markup=None)
+    await callback_query.message.answer("Выберите дату заезда",
+                                        reply_markup=await SimpleCalendar().start_calendar())
     await LowPrice.date_of_entry.set()
 
 
@@ -172,25 +175,22 @@ async def load_quantity_hotels(message: types.Message, state: FSMContext):
 
     await message.answer('Нужно показать фото отелей?', reply_markup=photo_hotel)
     await message.delete()
-    await LowPrice.photo.set()
+    await LowPrice.need_photo.set()
 
 
-@dp.message_handler(Text(equals='НЕТ 🚫️'), state=LowPrice.photo)
-async def send_result_without_photo(message: types.Message, state: FSMContext):
-    await message.reply('Держи без фото')
+@dp.message_handler(Text(equals='НЕТ 🚫️'), state=LowPrice.need_photo)
+async def need_photo(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        city_name = data['city']
-    text = f"Вы выбрали город: {city_name}"
-    await message.answer(text)
-
-    await message.delete()
+        data['need_photo'] = message.text
+        await message.reply('Держи без фото')
+        await print_data_without_photo(message, data)
     await state.finish()
 
 
-@dp.message_handler(Text(equals='ДА ☑️'), state=LowPrice.photo)
+@dp.message_handler(Text(equals='ДА ☑️'), state=LowPrice.need_photo)
 async def get_quantity_photo(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        data['photo'] = message.text
+        data['need_photo'] = message.text
     await message.answer('Сколько фото показать?', reply_markup=ReplyKeyboardRemove())
     await LowPrice.quantity_photo.set()
     await message.delete()
@@ -200,7 +200,8 @@ async def get_quantity_photo(message: types.Message, state: FSMContext):
 async def send_result_with_photo(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['quantity_photo'] = message.text
-    await message.reply('Поиск с фото')
+        await message.reply('Держи с фото')
+        await print_data_with_photo(message, data)
     await state.finish()
 
 
