@@ -5,6 +5,7 @@ from aiogram.dispatcher.filters.state import StatesGroup, State
 class LowPrice(StatesGroup):
     start = State()
     city = State()
+    destinationId = State()
     date_of_entry = State()
     departure_date = State()
     quantity_hotels = State()

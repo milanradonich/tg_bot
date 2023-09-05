@@ -53,11 +53,12 @@ def get_inline() -> InlineKeyboardMarkup:
     return inline_kb
 
 
-# def get_city_btn(message: Message, possible_city: Dict):
-
-
-
-
+def get_city_btn(city_list: Dict):
+    keyboard = []
+    for city_id, city_name in city_list.items():
+        button = InlineKeyboardButton(city_name, callback_data=city_id)
+        keyboard.append([button])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 # кнопка для FSM
@@ -126,6 +127,15 @@ async def load_city(message: types.Message, state: FSMContext):
         data['city'] = message.text
 
     possible_city = destination_id(data['city'])
+    await message.answer('Выбери город: ', reply_markup=get_city_btn(possible_city))
+
+    await LowPrice.destinationId.set()
+
+
+@dp.message_handler(state=LowPrice.city)
+async def load_city(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['city'] = message.text
 
     await message.answer("Выберите дату заезда",
                          reply_markup=await SimpleCalendar().start_calendar())
