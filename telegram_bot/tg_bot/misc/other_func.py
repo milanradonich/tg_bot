@@ -1,5 +1,6 @@
 from aiogram.types import Message
 from typing import Dict
+import json
 
 
 async def print_data_without_photo(message: Message, data: Dict):
@@ -27,4 +28,12 @@ async def print_data_with_photo(message: Message, data: Dict):
                     )
 
     await message.answer(text_message)
+
+
+def get_hotels(response_text: str):
+    pass
+
+
+def hotel_info(hotels_request: str):
+    pass
 
