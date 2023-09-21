@@ -12,6 +12,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram_calendar import simple_cal_callback, SimpleCalendar, dialog_cal_callback, DialogCalendar
 
+import hotels_requests
 from config import API_TOKEN
 from typing import Dict
 
@@ -19,7 +20,7 @@ from tg_bot.misc.other_func import print_data_without_photo, print_data_with_pho
 from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
 from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
 from tg_bot.DB.SQlite import db_start, create_profile, edit_profile
-from hotels_requests import destination_id
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -126,7 +127,7 @@ async def load_city(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['city'] = message.text
 
-    possible_city = destination_id(data['city'])
+    possible_city = hotels_requests.destination_id(data['city'])
     await message.answer('Выбери город: ', reply_markup=get_city_btn(possible_city))
     await LowPrice.destinationId.set()
 

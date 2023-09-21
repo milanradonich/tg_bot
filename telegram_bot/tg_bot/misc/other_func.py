@@ -2,6 +2,8 @@ from aiogram.types import Message
 from typing import Dict
 import json
 
+import hotels_requests
+
 
 async def print_data_without_photo(message: Message, data: Dict):
     text_message = ('Данные вашего запроса: \n'
@@ -14,6 +16,7 @@ async def print_data_without_photo(message: Message, data: Dict):
                     )
 
     await message.answer(text_message)
+    await message.answer(hotels_requests.get_info_hotels(message, data))
 
 
 async def print_data_with_photo(message: Message, data: Dict):
@@ -28,12 +31,43 @@ async def print_data_with_photo(message: Message, data: Dict):
                     )
 
     await message.answer(text_message)
+    await message.answer(hotels_requests.get_info_hotels(message, data))
 
 
 def get_hotels(response_text: str):
-    pass
+    data = json.loads(response_text)
+    if not data:
+        raise LookupError('Запрос пуст...')
+    if 'errors' in data.keys():
+        return {'error': data['errors'][0]['message']}
+
+    hotels_data = {}
+    for hotel in data['data']['propertySearch']['properties']:
+        try:
+            hotels_data[hotel['id']] = {
+                'name': hotel['name'], 'id': hotel['id'],
+                'distance': hotel['destinationInfo']['distanceFromDestination']['value'],
+                'unit': hotel['destinationInfo']['distanceFromDestination']['unit'],
+                'price': hotel['price']['lead']['amount']
+            }
+        except (KeyError, TypeError):
+            continue
+    return hotels_data
 
 
 def hotel_info(hotels_request: str):
-    pass
+    data = json.loads(hotels_request)
+    if not data:
+        raise LookupError('Запрос пуст...')
+    hotel_data = {
+        'id': data['data']['propertyInfo']['summary']['id'], 'name': data['data']['propertyInfo']['summary']['name'],
+        'address': data['data']['propertyInfo']['summary']['location']['address']['addressLine'],
+        'coordinates': data['data']['propertyInfo']['summary']['location']['coordinates'],
+        'images': [
+            url['image']['url'] for url in data['data']['propertyInfo']['propertyGallery']['images']
+
+        ]
+    }
+
+    return hotel_data
 

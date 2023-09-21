@@ -5,7 +5,7 @@ import config
 import random
 
 
-from aiogram.types import Message
+from aiogram.types import Message, InputMediaPhoto
 from typing import Dict
 
 import tg_bot.misc.other_func
@@ -15,9 +15,27 @@ from tg_bot.misc.other_func import get_hotels, hotel_info
 my_url = "https://hotels4.p.rapidapi.com/locations/v2/search"
 
 headers = {
+    "content-type": "application/json",
     "X-RapidAPI-Key": config.RAPID_API_KEY,
     "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
 }
+
+
+def request(method: str, url: str, query_string: dict) -> requests.Response:
+    """
+    Посылаем запрос к серверу
+    : param method : str
+    : param url : str
+    : param query_string : dict
+    : return : request.Response
+    """
+
+    if method == "GET":
+        response_get = requests.request("GET", url, params=query_string, headers=headers)
+        return response_get
+    elif method == "POST":
+        response_post = requests.request("POST", url, json=query_string, headers=headers)
+        return response_post
 
 
 def destination_id(city):
@@ -43,23 +61,23 @@ def destination_id(city):
     return possible_city
 
 
-def get_info_hotels(message: Message, data: Dict):
+async def get_info_hotels(message: Message, data: Dict):
     payload = {
         "currency": "USD",
         "eapid": 1,
         "locale": "en_US",
         "siteId": 300000001,
         "destination": {"regionId": data['destinationId']},
-        "checkInDate": {
-            'day': int(data['date_of_entry']['day']),
-            'month': int(data['date_of_entry']['month']),
-            'year': int(data['date_of_entry']['year'])
-        },
-        "checkOutDate": {
-            'day': int(data['departure_date']['day']),
-            'month': int(data['departure_date']['month']),
-            'year': int(data['departure_date']['year'])
-        },
+        "checkInDate": str(data['date_of_entry'])
+            # 'day': int(data['date_of_entry']['day']),
+            # 'month': int(data['date_of_entry']['month']),
+            # 'year': int(data['date_of_entry']['year'])
+        ,
+        "checkOutDate": str(data['departure_date'])
+            # 'day': int(data['departure_date']['day']),
+            # 'month': int(data['departure_date']['month']),
+            # 'year': int(data['departure_date']['year'])
+        ,
         "rooms": [
             {
                 "adults": 2,
@@ -77,9 +95,14 @@ def get_info_hotels(message: Message, data: Dict):
 
     url = "https://hotels4.p.rapidapi.com/properties/v2/list"
 
-    response_hotels = requests.post('POST', json=payload, headers=headers)
+    response_hotels = request('POST', url, payload)
     if response_hotels.status_code == 200:
-        hotels = tg_bot.misc.other_func.get_hotels(response_hotels.text)
+        hotels = get_hotels(response_hotels.text)
+
+        if 'error' in hotels:
+            bot.send_message(message.chat.id, hotels['error'])
+            bot.send_message(message.chat.id, 'Попробуйте осуществить поиск с другими параметрами')
+            bot.send_message(message.chat.id, '')
 
         count = 0
         for hotel in hotels.values():
@@ -93,9 +116,10 @@ def get_info_hotels(message: Message, data: Dict):
                     "propertyId": hotel['id']
                 }
                 summary_url = "https://hotels4.p.rapidapi.com/properties/v2/get-summary"
-                get_summary = requests.post('POST', summary_url, summary_payload)
+                get_summary = request('POST', summary_url, summary_payload)
                 if get_summary.status_code == 200:
                     summary_info = hotel_info(get_summary.text)
+
                     caption = f'Название: {hotel["name"]}\n ' \
                               f'Адрес: {summary_info["address"]}\n' \
                               f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
@@ -122,14 +146,15 @@ def get_info_hotels(message: Message, data: Dict):
                             else:
                                 medias.append(InputMediaPhoto(media=url))
 
-                        bot.send_media_group(message.chat.id, medias)
+                        await bot.send_media_group(message.chat.id, medias)
                     else:
                         # если фотки не нужны, то просто выводим данные об отеле
-                        bot.send_message(message.chat.id, caption)
+                        await bot.send_message(message.chat.id, caption)
+
                 else:
-                    bot.send_message(message.chat.id, f'Что-то пошло не так, код ошибки: {get_summary.status_code}')
+                    await bot.send_message(message.chat.id, f'Что-то пошло не так, код ошибки: {get_summary.status_code}')
             else:
                 break
     else:
-        bot.send_message(message.chat.id, f'Что-то пошло не так, код ошибки: {response_hotels.status_code}')
-    bot.send_message(message.chat.id, 'Поиск окончен!')
+        await bot.send_message(message.chat.id, f'Что-то пошло не так, код ошибки: {response_hotels.status_code}')
+    await bot.send_message(message.chat.id, 'Поиск окончен!')
