@@ -1,6 +1,7 @@
 from aiogram.types import Message
 from typing import Dict
 import json
+import asyncio
 
 import hotels_requests
 
@@ -16,7 +17,7 @@ async def print_data_without_photo(message: Message, data: Dict):
                     )
 
     await message.answer(text_message)
-    await message.answer(hotels_requests.get_info_hotels(message, data))
+    await message.answer(await hotels_requests.get_info_hotels(message, data))
 
 
 async def print_data_with_photo(message: Message, data: Dict):
@@ -31,7 +32,7 @@ async def print_data_with_photo(message: Message, data: Dict):
                     )
 
     await message.answer(text_message)
-    await message.answer(hotels_requests.get_info_hotels(message, data))
+    await message.answer(await hotels_requests.get_info_hotels(message, data))
 
 
 def get_hotels(response_text: str):

@@ -3,6 +3,7 @@ import json
 import re
 import config
 import random
+import asyncio
 
 
 from aiogram.types import Message, InputMediaPhoto
@@ -21,21 +22,20 @@ headers = {
 }
 
 
-def request(method: str, url: str, query_string: dict) -> requests.Response:
-    """
-    Посылаем запрос к серверу
-    : param method : str
-    : param url : str
-    : param query_string : dict
-    : return : request.Response
-    """
-
-    if method == "GET":
-        response_get = requests.request("GET", url, params=query_string, headers=headers)
-        return response_get
-    elif method == "POST":
-        response_post = requests.request("POST", url, json=query_string, headers=headers)
-        return response_post
+# def request(method: str, url: str, querystring: dict) -> requests.Response:
+#     """
+#     Посылаем запрос к серверу
+#     : param method : str
+#     : param url : str
+#     : param query_string : dict
+#     : return : request.Response
+#     """
+#     if method == "GET":
+#         response_get = requests.request("GET", url, params=querystring, headers=headers)
+#         return response_get
+#     elif method == "POST":
+#         response_post = requests.request("POST", url, json=querystring, headers=headers)
+#         return response_post
 
 
 def destination_id(city):
@@ -95,7 +95,7 @@ async def get_info_hotels(message: Message, data: Dict):
 
     url = "https://hotels4.p.rapidapi.com/properties/v2/list"
 
-    response_hotels = request('POST', url, payload)
+    response_hotels = requests.post(url, json=payload, headers=headers)
     if response_hotels.status_code == 200:
         hotels = get_hotels(response_hotels.text)
 
@@ -116,7 +116,7 @@ async def get_info_hotels(message: Message, data: Dict):
                     "propertyId": hotel['id']
                 }
                 summary_url = "https://hotels4.p.rapidapi.com/properties/v2/get-summary"
-                get_summary = request('POST', summary_url, summary_payload)
+                get_summary = requests.post(summary_url, json=summary_payload, headers=headers)
                 if get_summary.status_code == 200:
                     summary_info = hotel_info(get_summary.text)
 
