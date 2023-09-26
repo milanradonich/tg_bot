@@ -3,14 +3,12 @@ import json
 import re
 import config
 import random
-import asyncio
 
 
 from aiogram.types import Message, InputMediaPhoto
 from typing import Dict
-
-import tg_bot.misc.other_func
 from main import bot
+from tg_bot.database import add_response
 from tg_bot.misc.other_func import get_hotels, hotel_info
 
 my_url = "https://hotels4.p.rapidapi.com/locations/v2/search"
@@ -134,10 +132,11 @@ async def get_info_hotels(message: Message, data: Dict):
                     except IndexError:
                         continue
 
-                    # data_to_db = {hotel['id']: {'name': hotel['name'], 'address': summary_info['address'],
-                    #                             'price': hotel['price'], 'distance': round(hotel["distance"], 2),
-                    #                             'date_time': data['date_time'], 'images': links_to_images}}
-                    # database.add_to_bd.add_response(data_to_db)
+                    data_to_db = {hotel['id']: {'name': hotel['name'], 'address': summary_info['address'],
+                                                'price': hotel['price'], 'distance': round(hotel["distance"], 2),
+                                                'date_time': data['date_time'], 'images': links_to_images}}
+                    await add_response(data_to_db)
+
                     if int(data['quantity_photo']) > 0:
                         # формируем MediaGroup с фотографиями и описанием отеля и посылаем в чат
                         for number, url in enumerate(links_to_images):
