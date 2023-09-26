@@ -3,7 +3,9 @@ import json
 import re
 import config
 import random
-
+# """
+# sdcsdcsdcsdc
+# """
 
 from aiogram.types import Message, InputMediaPhoto
 from typing import Dict
