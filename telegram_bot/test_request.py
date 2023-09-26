@@ -32,3 +32,5 @@ for item in info_list:
                     city_name = re.sub(pattern, '', hotel.get('caption'))
                     possible_city[city_id] = city_name
 print(possible_city)
+
+
