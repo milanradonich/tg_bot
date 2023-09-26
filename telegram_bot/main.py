@@ -1,25 +1,23 @@
 import logging
 import datetime
-import asyncio
-import pprint
 
-from aiogram.types import BotCommand, CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup, \
+from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, \
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.utils.callback_data import CallbackData
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
-from aiogram_calendar import simple_cal_callback, SimpleCalendar, dialog_cal_callback, DialogCalendar
+from aiogram_calendar import simple_cal_callback, SimpleCalendar
 
 import hotels_requests
 from config import API_TOKEN
 from typing import Dict
 
-from tg_bot.misc.other_func import print_data_without_photo, print_data_with_photo
-from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
-from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
-from tg_bot.DB.SQlite import db_start, create_profile, edit_profile
+from telegram_bot.tg_bot.misc.other_func import print_data_with_photo, print_data_without_photo
+from tg_bot.keyboards.base_btn import photo_hotel
+from tg_bot.state.lowprice_state import LowPrice
+from tg_bot.DB.SQlite import db_start, create_profile
 
 
 logging.basicConfig(level=logging.INFO)
@@ -186,6 +184,7 @@ async def need_photo(message: types.Message, state: FSMContext):
         await message.reply('Держи без фото')
         await print_data_without_photo(message, data)
     await state.finish()
+
 
 
 @dp.message_handler(Text(equals='ДА ☑️'), state=LowPrice.need_photo)

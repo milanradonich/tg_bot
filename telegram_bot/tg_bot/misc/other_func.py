@@ -3,10 +3,13 @@ from typing import Dict
 import json
 import asyncio
 
-import hotels_requests
+
+import telegram_bot.tg_bot.DB.add_to_db
+from telegram_bot import hotels_requests
 
 
 async def print_data_without_photo(message: Message, data: Dict):
+    telegram_bot.tg_bot.DB.add_to_db.add_query(data)
     text_message = ('Данные вашего запроса: \n'
                     f'Название города: {data["city"]}\n'
                     f'ID города: {data["destinationId"]}\n'
@@ -21,6 +24,7 @@ async def print_data_without_photo(message: Message, data: Dict):
 
 
 async def print_data_with_photo(message: Message, data: Dict):
+    telegram_bot.tg_bot.DB.add_to_db.add_query(data)
     text_message = ('Данные вашего запроса: \n'
                     f'Название города: {data["city"]}\n'
                     f'ID города: {data["destinationId"]}\n'
