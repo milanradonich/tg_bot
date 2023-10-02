@@ -3,42 +3,25 @@ import json
 import re
 import config
 import random
-# """
-# sdcsdcsdcsdc
-# """
 
 from aiogram.types import Message, InputMediaPhoto
 from typing import Dict
+from aiogram import Bot, Dispatcher, executor, types
+
 from main import bot
-from tg_bot.database import add_response
-from tg_bot.misc.other_func import get_hotels, hotel_info
-
-my_url = "https://hotels4.p.rapidapi.com/locations/v2/search"
-
-headers = {
-    "content-type": "application/json",
-    "X-RapidAPI-Key": config.RAPID_API_KEY,
-    "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
-}
 
 
-# def request(method: str, url: str, querystring: dict) -> requests.Response:
-#     """
-#     Посылаем запрос к серверу
-#     : param method : str
-#     : param url : str
-#     : param query_string : dict
-#     : return : request.Response
-#     """
-#     if method == "GET":
-#         response_get = requests.request("GET", url, params=querystring, headers=headers)
-#         return response_get
-#     elif method == "POST":
-#         response_post = requests.request("POST", url, json=querystring, headers=headers)
-#         return response_post
+# from main import bot
 
 
-def destination_id(city):
+def get_id_city(city):
+    my_url = "https://hotels4.p.rapidapi.com/locations/v2/search"
+
+    headers = {
+        "X-RapidAPI-Key": config.RAPID_API_KEY,
+        "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
+    }
+
     pattern = '<[^<]+?>'
     querystring = {"query": city, "locale": "en_US", "currency": "USD"}
     response = requests.get(my_url, headers=headers, params=querystring)
@@ -61,23 +44,30 @@ def destination_id(city):
     return possible_city
 
 
-async def get_info_hotels(message: Message, data: Dict):
+# 712491
+
+
+async def find_hotels(message, data):
+    url = "https://hotels4.p.rapidapi.com/properties/v2/list"
+
     payload = {
         "currency": "USD",
         "eapid": 1,
         "locale": "en_US",
         "siteId": 300000001,
         "destination": {"regionId": data['destinationId']},
-        "checkInDate": str(data['date_of_entry'])
-            # 'day': int(data['date_of_entry']['day']),
-            # 'month': int(data['date_of_entry']['month']),
-            # 'year': int(data['date_of_entry']['year'])
-        ,
-        "checkOutDate": str(data['departure_date'])
-            # 'day': int(data['departure_date']['day']),
-            # 'month': int(data['departure_date']['month']),
-            # 'year': int(data['departure_date']['year'])
-        ,
+        "checkInDate": {
+            data['date_of_entry']
+            # "day": 10,
+            # "month": 10,
+            # "year": 2023
+        },
+        "checkOutDate": {
+            data['departure_date']
+            # "day": 15,
+            # "month": 10,
+            # "year": 2023
+        },
         "rooms": [
             {
                 "adults": 2,
@@ -85,29 +75,41 @@ async def get_info_hotels(message: Message, data: Dict):
             }
         ],
         "resultsStartingIndex": 0,
-        "resultsSize": 30,
-        "sort": 'PRICE_LOW_TO_HIGH',
+        "resultsSize": 200,
+        "sort": "PRICE_LOW_TO_HIGH",
         "filters": {"price": {
             "max": 150,
             "min": 10
         }}
     }
 
-    url = "https://hotels4.p.rapidapi.com/properties/v2/list"
+    headers = {
+        "content-type": "application/json",
+        "X-RapidAPI-Key": config.RAPID_API_KEY,
+        "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
+    }
 
-    response_hotels = requests.post(url, json=payload, headers=headers)
-    if response_hotels.status_code == 200:
-        hotels = get_hotels(response_hotels.text)
+    response_properties = requests.post(url, payload, headers)
+    # assert 200 == response_properties.status_code
+    if response_properties.status_code == 200:
+        print('Успешно!')
+        all_info = json.loads(response_properties.text)
+        hotels_data = {}
+        for hotel in all_info['data']['propertySearch']['properties']:
+            try:
+                hotels_data[hotel['id']] = {
+                    'name': hotel['name'], 'id': hotel['id'],
+                    'distance': hotel['destinationInfo']['distanceFromDestination']['value'],
+                    'unit': hotel['destinationInfo']['distanceFromDestination']['unit'],
+                    'price': hotel['price']['lead']['amount']
+                }
+            except (KeyError, TypeError):
+                continue
 
-        if 'error' in hotels:
-            bot.send_message(message.chat.id, hotels['error'])
-            bot.send_message(message.chat.id, 'Попробуйте осуществить поиск с другими параметрами')
-            bot.send_message(message.chat.id, '')
-
-        count = 0
-        for hotel in hotels.values():
-            if count < int(data['quantity_hotels']):
-                count += 1
+        count_hotels = 0
+        for hotel in hotels_data.values():
+            if count_hotels < int(data['quantity_hotels']):
+                count_hotels += 1
                 summary_payload = {
                     "currency": "USD",
                     "eapid": 1,
@@ -116,46 +118,109 @@ async def get_info_hotels(message: Message, data: Dict):
                     "propertyId": hotel['id']
                 }
                 summary_url = "https://hotels4.p.rapidapi.com/properties/v2/get-summary"
-                get_summary = requests.post(summary_url, json=summary_payload, headers=headers)
-                if get_summary.status_code == 200:
-                    summary_info = hotel_info(get_summary.text)
+                summary_response = requests.post(summary_url, json=summary_payload, headers=headers)  # !!!!!
+                assert 200 == summary_response.status_code
+                if summary_response.status_code == 200:
+                    print('Успешно!')
+                    info_summary = json.loads(summary_response.text)
+
+                    hotel_data = {
+                        'id': info_summary['data']['propertyInfo']['summary']['id'],
+                        'name': info_summary['data']['propertyInfo']['summary']['name'],
+                        'address': info_summary['data']['propertyInfo']['summary']['location']['address'][
+                            'addressLine'],
+                        'coordinates': info_summary['data']['propertyInfo']['summary']['location']['coordinates'],
+                        'images': [
+                            url['image']['url'] for url in
+                            info_summary['data']['propertyInfo']['propertyGallery']['images']
+
+                        ]
+                    }
 
                     caption = f'Название: {hotel["name"]}\n ' \
-                              f'Адрес: {summary_info["address"]}\n' \
+                              f'Адрес: {hotel_data["address"]}\n' \
                               f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
-                              # f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
+                              f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
 
                     medias = []
                     links_to_images = []
+
                     try:
-                        for random_url in range(int(data['quantity_photo'])):
-                            links_to_images.append(summary_info['images']
-                                                   [random.randint(0, len(summary_info['images']) - 1)])
+                        for random_url in range(int(data['quantity_hotels'])):
+                            links_to_images.append(hotel_data['images']
+                                                   [random.randint(0, len(hotel_data['images']) - 1)])
                     except IndexError:
                         continue
 
-                    data_to_db = {hotel['id']: {'name': hotel['name'], 'address': summary_info['address'],
-                                                'price': hotel['price'], 'distance': round(hotel["distance"], 2),
-                                                'date_time': data['date_time'], 'images': links_to_images}}
-                    await add_response(data_to_db)
-
-                    if int(data['quantity_photo']) > 0:
-                        # формируем MediaGroup с фотографиями и описанием отеля и посылаем в чат
+                    if int(data['quantity_hotels']) > 0:
                         for number, url in enumerate(links_to_images):
                             if number == 0:
                                 medias.append(InputMediaPhoto(media=url, caption=caption))
                             else:
                                 medias.append(InputMediaPhoto(media=url))
-
-                        await bot.send_media_group(message.chat.id, medias)
+                        await medias
                     else:
-                        # если фотки не нужны, то просто выводим данные об отеле
-                        await bot.send_message(message.chat.id, caption)
+                        await caption
 
-                else:
-                    await bot.send_message(message.chat.id, f'Что-то пошло не так, код ошибки: {get_summary.status_code}')
-            else:
-                break
     else:
-        await bot.send_message(message.chat.id, f'Что-то пошло не так, код ошибки: {response_hotels.status_code}')
-    await bot.send_message(message.chat.id, 'Поиск окончен!')
+        print('Провал(')
+
+#
+# print(get_id_city('rome'))
+# print(find_hotels)
+
+# class Test_new_location():
+#     """Работа с новой локацией"""
+#     def test_create_new_location(self):
+#         """создание новой локации"""
+#
+#         base_url = 'https://rahulshettyacademy.com'  # базовая юрл
+#         key = '?key=qaclick123'     # Параметр для всех запросов
+#         post_resouce = '/maps/api/place/add/json'  # ресурс метода пост
+#
+#         post_url = base_url + post_resouce + key
+#
+#         json_create_new_location = {
+#             "location": {
+#                 "lat": -38.383494,
+#                 "lng": 33.427362
+#             }, "accuracy": 50,
+#             "name": "Frontline house",
+#             "phone_number": "(+91) 983 893 3937",
+#             "address": "29, side layout, cohen 09",
+#             "types": [
+#                 "shoe park",
+#                 "shop"
+#             ],
+#             "website": "http://google.com",
+#             "language": "French-IN"
+#
+#         }
+#
+#         result_post = requests.post(post_url, json=json_create_new_location)
+#         print(result_post.text)
+#         print("Статус код: " + str(result_post.status_code))
+#         assert 200 == result_post.status_code
+#         if result_post.status_code == 200:
+#             print('Успешно!')
+#         else:
+#             print('Провал(')
+#
+#         check_post = result_post.json()
+#         check_info_post = check_post.get("status")
+#         print("Статус-код ответа: " + check_info_post)
+#         assert check_info_post =='OK'
+#         print("статус верный")
+#         place_id = check_post.get("place_id")
+#
+#         """проверка локации"""
+#
+#         get_resource = '/maps/api/place/get/json'
+#         get_url = base_url + get_resource + key + "&place_id=" + place_id
+#         print(get_url)
+#         result_get = requests.get(get_url)
+#         print(result_get.text)
+#
+#
+# new_place = Test_new_location()
+# new_place.test_create_new_location()

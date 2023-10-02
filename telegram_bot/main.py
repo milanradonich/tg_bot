@@ -15,7 +15,7 @@ import hotels_requests
 from config import API_TOKEN
 from typing import Dict
 
-from tg_bot.database import add_user
+# from tg_bot.database import add_user
 from tg_bot.misc.other_func import print_data_without_photo, print_data_with_photo
 from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
 from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
@@ -112,7 +112,7 @@ async def send_welcome(message: types.Message) -> None:
                         f"Я помогу тебе найти жилье в разных странах и городах.")
 
     # await create_profile(user_id=message.from_user.id)  # создается профиль юзера
-    await add_user(message.chat.id, message.from_user.username, message.from_user.full_name)
+    # await add_user(message.chat.id, message.from_user.username, message.from_user.full_name)
     await message.delete()
 
 
@@ -127,8 +127,9 @@ async def city_input(message: types.Message) -> None:
 async def load_city(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['city'] = message.text
+        data['chat_id'] = message.chat.id
 
-    possible_city = hotels_requests.destination_id(data['city'])
+    possible_city = hotels_requests.get_id_city(data['city'])
     await message.answer('Выбери город: ', reply_markup=get_city_btn(possible_city))
     await LowPrice.destinationId.set()
 

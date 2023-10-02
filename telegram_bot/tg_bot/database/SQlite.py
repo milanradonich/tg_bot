@@ -1,5 +1,5 @@
 # import sqlite3 as sq
-# wwwwwwwwwwwwwwwwww
+#
 #
 # async def db_start():
 #     global db, cur
