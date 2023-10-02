@@ -1,3 +1,4 @@
+import dp
 import requests
 import json
 import re
@@ -158,69 +159,11 @@ async def find_hotels(message, data):
                                 medias.append(InputMediaPhoto(media=url, caption=caption))
                             else:
                                 medias.append(InputMediaPhoto(media=url))
-                        await medias
+                        await message.answer(medias)
                     else:
-                        await caption
+                        await message.answer(caption)
 
     else:
         print('Провал(')
 
-#
-# print(get_id_city('rome'))
-# print(find_hotels)
 
-# class Test_new_location():
-#     """Работа с новой локацией"""
-#     def test_create_new_location(self):
-#         """создание новой локации"""
-#
-#         base_url = 'https://rahulshettyacademy.com'  # базовая юрл
-#         key = '?key=qaclick123'     # Параметр для всех запросов
-#         post_resouce = '/maps/api/place/add/json'  # ресурс метода пост
-#
-#         post_url = base_url + post_resouce + key
-#
-#         json_create_new_location = {
-#             "location": {
-#                 "lat": -38.383494,
-#                 "lng": 33.427362
-#             }, "accuracy": 50,
-#             "name": "Frontline house",
-#             "phone_number": "(+91) 983 893 3937",
-#             "address": "29, side layout, cohen 09",
-#             "types": [
-#                 "shoe park",
-#                 "shop"
-#             ],
-#             "website": "http://google.com",
-#             "language": "French-IN"
-#
-#         }
-#
-#         result_post = requests.post(post_url, json=json_create_new_location)
-#         print(result_post.text)
-#         print("Статус код: " + str(result_post.status_code))
-#         assert 200 == result_post.status_code
-#         if result_post.status_code == 200:
-#             print('Успешно!')
-#         else:
-#             print('Провал(')
-#
-#         check_post = result_post.json()
-#         check_info_post = check_post.get("status")
-#         print("Статус-код ответа: " + check_info_post)
-#         assert check_info_post =='OK'
-#         print("статус верный")
-#         place_id = check_post.get("place_id")
-#
-#         """проверка локации"""
-#
-#         get_resource = '/maps/api/place/get/json'
-#         get_url = base_url + get_resource + key + "&place_id=" + place_id
-#         print(get_url)
-#         result_get = requests.get(get_url)
-#         print(result_get.text)
-#
-#
-# new_place = Test_new_location()
-# new_place.test_create_new_location()
