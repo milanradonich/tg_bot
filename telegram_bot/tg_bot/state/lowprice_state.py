@@ -17,13 +17,13 @@ class LowPrice(StatesGroup):
     quantity_photo = State()
 
 
-class ClientStatesGroup(StatesGroup):
-    photo = State()
-    descr = State()
-
-
-class ProfileStatesGroup(StatesGroup):
-    photo = State()
-    name = State()
-    age = State()
-    descr = State()
+# class ClientStatesGroup(StatesGroup):
+#     photo = State()
+#     descr = State()
+#
+#
+# class ProfileStatesGroup(StatesGroup):
+#     photo = State()
+#     name = State()
+#     age = State()
+#     descr = State()

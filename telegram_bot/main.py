@@ -18,7 +18,7 @@ from typing import Dict
 # from tg_bot.database import add_user
 from tg_bot.misc.other_func import print_data_without_photo, print_data_with_photo
 from tg_bot.keyboards.base_btn import photo_hotel, photo_choice, ikb
-from tg_bot.state.lowprice_state import ClientStatesGroup, ProfileStatesGroup, LowPrice
+from tg_bot.state.lowprice_state import LowPrice
 # from tg_bot.database.SQlite import db_start, create_profile, edit_profile
 
 

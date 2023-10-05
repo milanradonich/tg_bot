@@ -45,7 +45,7 @@ def get_id_city(city):
     return possible_city
 
 
-# 712491
+# 712491 id Рима
 
 
 async def find_hotels(message, data):
