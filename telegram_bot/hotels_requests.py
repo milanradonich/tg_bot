@@ -9,11 +9,6 @@ from aiogram.types import Message, InputMediaPhoto
 from typing import Dict
 from aiogram import Bot, Dispatcher, executor, types
 
-from main import bot
-
-
-# from main import bot
-
 
 def get_id_city(city):
     my_url = "https://hotels4.p.rapidapi.com/locations/v2/search"
@@ -90,7 +85,7 @@ async def find_hotels(message, data):
         "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
     }
 
-    response_properties = requests.post(url, payload, headers)
+    response_properties = requests.post(url, json=payload, headers=headers)
     # assert 200 == response_properties.status_code
     if response_properties.status_code == 200:
         print('Успешно!')
@@ -119,7 +114,7 @@ async def find_hotels(message, data):
                     "propertyId": hotel['id']
                 }
                 summary_url = "https://hotels4.p.rapidapi.com/properties/v2/get-summary"
-                summary_response = requests.post(summary_url, json=summary_payload, headers=headers)  # !!!!!
+                summary_response = requests.post(summary_url, json=summary_payload, headers=headers)
                 assert 200 == summary_response.status_code
                 if summary_response.status_code == 200:
                     print('Успешно!')
