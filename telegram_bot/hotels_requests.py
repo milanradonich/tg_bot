@@ -90,7 +90,7 @@ async def find_hotels(message, data):
     if response_properties.status_code == 200:
         print('Успешно!')
         all_info = json.loads(response_properties.text)
-        hotels_data = {}
+        hotels_data = dict()
         for hotel in all_info['data']['propertySearch']['properties']:
             try:
                 hotels_data[hotel['id']] = {
@@ -114,21 +114,22 @@ async def find_hotels(message, data):
                     "propertyId": hotel['id']
                 }
                 summary_url = "https://hotels4.p.rapidapi.com/properties/v2/get-summary"
-                summary_response = requests.post(summary_url, json=summary_payload, headers=headers)
-                assert 200 == summary_response.status_code
+                summary_response = requests.post(summary_url, json=summary_payload, headers=headers)  #!!!!!!
+                # assert 200 == summary_response.status_code
                 if summary_response.status_code == 200:
                     print('Успешно!')
                     info_summary = json.loads(summary_response.text)
+                    data = json.loads(info_summary)
 
                     hotel_data = {
-                        'id': info_summary['data']['propertyInfo']['summary']['id'],
-                        'name': info_summary['data']['propertyInfo']['summary']['name'],
-                        'address': info_summary['data']['propertyInfo']['summary']['location']['address'][
+                        'id': data['data']['propertyInfo']['summary']['id'],
+                        'name': data['data']['propertyInfo']['summary']['name'],
+                        'address': data['data']['propertyInfo']['summary']['location']['address'][
                             'addressLine'],
-                        'coordinates': info_summary['data']['propertyInfo']['summary']['location']['coordinates'],
+                        'coordinates': data['data']['propertyInfo']['summary']['location']['coordinates'],
                         'images': [
                             url['image']['url'] for url in
-                            info_summary['data']['propertyInfo']['propertyGallery']['images']
+                            data['data']['propertyInfo']['propertyGallery']['images']
 
                         ]
                     }
@@ -154,9 +155,9 @@ async def find_hotels(message, data):
                                 medias.append(InputMediaPhoto(media=url, caption=caption))
                             else:
                                 medias.append(InputMediaPhoto(media=url))
-                        await message.answer(medias)
+                        await message.answer(message.chat.id, medias)
                     else:
-                        await message.answer(caption)
+                        await message.answer(message.chat.id, caption)
 
     else:
         print('Провал(')
