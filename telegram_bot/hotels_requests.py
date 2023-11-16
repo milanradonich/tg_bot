@@ -2,11 +2,15 @@ import dp
 import requests
 import json
 import re
+
+import states
+from aiogram.dispatcher import FSMContext
+
 import config
 import random
 
-from aiogram.types import Message, InputMediaPhoto
-from typing import Dict
+from aiogram.types import Message, InputMediaPhoto, message
+from typing import Dict, List
 from aiogram import Bot, Dispatcher, executor, types
 
 
@@ -86,11 +90,10 @@ async def find_hotels(message, data):
     }
 
     response_properties = requests.post(url, json=payload, headers=headers)
-    # assert 200 == response_properties.status_code
+
     if response_properties.status_code == 200:
-        print('Успешно!')
         all_info = json.loads(response_properties.text)
-        hotels_data = dict()
+        hotels_data = {}
         for hotel in all_info['data']['propertySearch']['properties']:
             try:
                 hotels_data[hotel['id']] = {
@@ -101,65 +104,90 @@ async def find_hotels(message, data):
                 }
             except (KeyError, TypeError):
                 continue
+        hotels_info_dict = dict()
+        for hotel in hotels_data:
+            if len(hotels_info_dict) >= int(data['quantity_hotels']):
+                break
 
-        count_hotels = 0
-        for hotel in hotels_data.values():
-            if count_hotels < int(data['quantity_hotels']):
-                count_hotels += 1
-                summary_payload = {
-                    "currency": "USD",
-                    "eapid": 1,
-                    "locale": "en_US",
-                    "siteId": 300000001,
-                    "propertyId": hotel['id']
-                }
-                summary_url = "https://hotels4.p.rapidapi.com/properties/v2/get-summary"
-                summary_response = requests.post(summary_url, json=summary_payload, headers=headers)  #!!!!!!
-                # assert 200 == summary_response.status_code
-                if summary_response.status_code == 200:
-                    print('Успешно!')
-                    info_summary = json.loads(summary_response.text)
-                    data = json.loads(info_summary)
+            hotel_id = hotel.get('id')
+            if not hotel_id:
+                continue
 
-                    hotel_data = {
-                        'id': data['data']['propertyInfo']['summary']['id'],
-                        'name': data['data']['propertyInfo']['summary']['name'],
-                        'address': data['data']['propertyInfo']['summary']['location']['address'][
-                            'addressLine'],
-                        'coordinates': data['data']['propertyInfo']['summary']['location']['coordinates'],
-                        'images': [
-                            url['image']['url'] for url in
-                            data['data']['propertyInfo']['propertyGallery']['images']
+            hotel_name = hotel.get('name')
+            price_per_night = hotel.get('price', {}).get('lead', {}).get('amount', 0)
+            score = hotel.get('reviews', {}).get('score', 0)
 
-                        ]
-                    }
+            hotels_info_dict[hotel_id] = {
+                'name': hotel_name,
+                'price_per_night': price_per_night,
+                'score': score,
+            }
 
-                    caption = f'Название: {hotel["name"]}\n ' \
-                              f'Адрес: {hotel_data["address"]}\n' \
-                              f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
-                              f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
+            result = f"<b> Отель:</b> {hotel['name']}\n" \
+                    f'Адрес: {hotels_data["address"]}\n' \
+                    f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
+                    f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
 
-                    medias = []
-                    links_to_images = []
-
-                    try:
-                        for random_url in range(int(data['quantity_hotels'])):
-                            links_to_images.append(hotel_data['images']
-                                                   [random.randint(0, len(hotel_data['images']) - 1)])
-                    except IndexError:
-                        continue
-
-                    if int(data['quantity_hotels']) > 0:
-                        for number, url in enumerate(links_to_images):
-                            if number == 0:
-                                medias.append(InputMediaPhoto(media=url, caption=caption))
-                            else:
-                                medias.append(InputMediaPhoto(media=url))
-                        await message.answer(message.chat.id, medias)
-                    else:
-                        await message.answer(message.chat.id, caption)
-
-    else:
-        print('Провал(')
+            return result
 
 
+
+    #     count_hotels = 0
+    #     for hotel in hotels_data.values():
+    #         if count_hotels < int(data['quantity_hotels']):
+    #             count_hotels += 1
+    #             summary_payload = {
+    #                 "currency": "USD",
+    #                 "eapid": 1,
+    #                 "locale": "en_US",
+    #                 "siteId": 300000001,
+    #                 "propertyId": hotel['id']
+    #             }
+    #             summary_url = "https://hotels4.p.rapidapi.com/properties/v2/get-summary"
+    #             summary_response = requests.post(summary_url, json=summary_payload, headers=headers)  # !!!!!!
+    #             # assert 200 == summary_response.status_code
+    #             if summary_response.status_code == 200:
+    #                 print('Успешно!')
+    #                 info_summary = json.loads(summary_response.text)
+    #                 data = json.loads(info_summary)
+    #
+    #                 hotel_data = {
+    #                     'id': data['data']['propertyInfo']['summary']['id'],
+    #                     'name': data['data']['propertyInfo']['summary']['name'],
+    #                     'address': data['data']['propertyInfo']['summary']['location']['address'][
+    #                         'addressLine'],
+    #                     'coordinates': data['data']['propertyInfo']['summary']['location']['coordinates'],
+    #                     'images': [
+    #                         url['image']['url'] for url in
+    #                         data['data']['propertyInfo']['propertyGallery']['images']
+    #
+    #                     ]
+    #                 }
+    #
+    #                 caption = f'Название: {hotel["name"]}\n ' \
+    #                           f'Адрес: {hotel_data["address"]}\n' \
+    #                           f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
+    #                           f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
+    #
+    #                 medias = []
+    #                 links_to_images = []
+    #
+    #                 try:
+    #                     for random_url in range(int(data['quantity_hotels'])):
+    #                         links_to_images.append(hotel_data['images']
+    #                                                [random.randint(0, len(hotel_data['images']) - 1)])
+    #                 except IndexError:
+    #                     continue
+    #
+    #                 if int(data['quantity_hotels']) > 0:
+    #                     for number, url in enumerate(links_to_images):
+    #                         if number == 0:
+    #                             medias.append(InputMediaPhoto(media=url, caption=caption))
+    #                         else:
+    #                             medias.append(InputMediaPhoto(media=url))
+    #                     await message.answer(message.chat.id, medias)
+    #                 else:
+    #                     await message.answer(message.chat.id, caption)
+    #
+    # else:
+    #     print('Провал(')

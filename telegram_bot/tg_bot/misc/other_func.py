@@ -20,6 +20,7 @@ async def print_data_without_photo(message: Message, data: Dict):
     await message.answer(await hotels_requests.find_hotels(message, data))
 
 
+
 async def print_data_with_photo(message: Message, data: Dict):
     text_message = ('Данные вашего запроса: \n'
                     f'Название города: {data["city"]}\n'
