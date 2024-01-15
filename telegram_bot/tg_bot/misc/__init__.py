@@ -1,1 +1,1 @@
-
+from .other_func import print_data_without_photo, print_data_with_photo

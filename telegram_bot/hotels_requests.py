@@ -15,7 +15,7 @@ from aiogram import Bot, Dispatcher, executor, types
 
 
 def get_id_city(city):
-    my_url = "https://hotels4.p.rapidapi.com/locations/v2/search"
+    my_url = "https://hotels4.p.rapidapi.com/locations/v3/search"
 
     headers = {
         "X-RapidAPI-Key": config.RAPID_API_KEY,
@@ -23,28 +23,26 @@ def get_id_city(city):
     }
 
     pattern = '<[^<]+?>'
-    querystring = {"query": city, "locale": "en_US", "currency": "USD"}
+    querystring = {"q": city, "locale": "en_US"}
     response = requests.get(my_url, headers=headers, params=querystring)
     data = json.loads(response.text)  # десериализация JSON
     # with open('descr_city.json', 'a') as city_file:
     # 	json.dump(data, city_file, indent=4)   # сериализация JSON
 
-    possible_city = {}
-    info_list = data.get("suggestions")
+    if response:
+        possible_city = {}
+        try:
+            for place in data.get('sr'):
+                if place.get('type') in ['CITY']:
+                    city_name = re.sub(pattern, '', place.get('regionNames').get('fullName'))
+                    # description = re.sub(pattern, '', place.get('regionNames').get('secondaryDisplayName'))
+                    city_id = place.get('gaiaId')
+                    possible_city[city_id] = city_name
 
-    for item in info_list:
-        for key, value in item.items():
-            if key == 'group' and value == 'CITY_GROUP':
-                hotels = item.get('entities')
-                for hotel in hotels:
-                    if hotel.get('type') == 'CITY':
-                        city_id = hotel.get('destinationId')
-                        city_name = re.sub(pattern, '', hotel.get('caption'))
-                        possible_city[city_id] = city_name
-    return possible_city
-
-
-# 712491 id Рима
+        except Exception:
+            possible_city = None
+        return possible_city
+    return None
 
 
 async def find_hotels(message, data):
@@ -57,16 +55,14 @@ async def find_hotels(message, data):
         "siteId": 300000001,
         "destination": {"regionId": data['destinationId']},
         "checkInDate": {
-            data['date_of_entry']
-            # "day": 10,
-            # "month": 10,
-            # "year": 2023
+            "day": int(data['date_of_entry'].day),
+            "month": int(data['date_of_entry'].month),
+            "year": int(data['date_of_entry'].year)
         },
         "checkOutDate": {
-            data['departure_date']
-            # "day": 15,
-            # "month": 10,
-            # "year": 2023
+            "day": int(data['departure_date'].day),
+            "month": int(data['departure_date'].month),
+            "year": int(data['departure_date'].year)
         },
         "rooms": [
             {
@@ -129,6 +125,8 @@ async def find_hotels(message, data):
                     f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
 
             return result
+
+
 
 
 
