@@ -96,12 +96,14 @@ async def find_hotels(message, data):
                     'name': hotel['name'], 'id': hotel['id'],
                     'distance': hotel['destinationInfo']['distanceFromDestination']['value'],
                     'unit': hotel['destinationInfo']['distanceFromDestination']['unit'],
-                    'price': hotel['price']['lead']['amount']
+                    'price': hotel['price']['lead']['amount'] # 250.000,
+                    # 'address":...,
+                    # "reviews":...,
                 }
             except (KeyError, TypeError):
                 continue
         hotels_info_dict = dict()
-        for hotel in hotels_data:
+        for hotel in hotels_data.values():
             if len(hotels_info_dict) >= int(data['quantity_hotels']):
                 break
 
@@ -110,17 +112,20 @@ async def find_hotels(message, data):
                 continue
 
             hotel_name = hotel.get('name')
-            price_per_night = hotel.get('price', {}).get('lead', {}).get('amount', 0)
-            score = hotel.get('reviews', {}).get('score', 0)
+            price_per_night = hotel.get('price', 0)
+            # score = hotel.get('reviews', {}).get('score', 0)
 
             hotels_info_dict[hotel_id] = {
                 'name': hotel_name,
                 'price_per_night': price_per_night,
-                'score': score,
+                # 'score': score,
             }
 
+            # result = f"<b> Отель:</b> {hotel['name']}\n" \
+            #         f'Адрес: {hotels_data["address"]}\n' \
+            #         f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
+            #         f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
             result = f"<b> Отель:</b> {hotel['name']}\n" \
-                    f'Адрес: {hotels_data["address"]}\n' \
                     f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
                     f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
 
@@ -148,7 +153,7 @@ async def find_hotels(message, data):
     #                 print('Успешно!')
     #                 info_summary = json.loads(summary_response.text)
     #                 data = json.loads(info_summary)
-    #
+    
     #                 hotel_data = {
     #                     'id': data['data']['propertyInfo']['summary']['id'],
     #                     'name': data['data']['propertyInfo']['summary']['name'],
@@ -158,25 +163,25 @@ async def find_hotels(message, data):
     #                     'images': [
     #                         url['image']['url'] for url in
     #                         data['data']['propertyInfo']['propertyGallery']['images']
-    #
+    
     #                     ]
     #                 }
-    #
+    
     #                 caption = f'Название: {hotel["name"]}\n ' \
     #                           f'Адрес: {hotel_data["address"]}\n' \
     #                           f'Стоимость проживания в сутки: {hotel["price"]}\n ' \
     #                           f'Расстояние до центра: {round(hotel["distance"], 2)} mile.\n'
-    #
+    
     #                 medias = []
     #                 links_to_images = []
-    #
+    
     #                 try:
     #                     for random_url in range(int(data['quantity_hotels'])):
     #                         links_to_images.append(hotel_data['images']
     #                                                [random.randint(0, len(hotel_data['images']) - 1)])
     #                 except IndexError:
     #                     continue
-    #
+    
     #                 if int(data['quantity_hotels']) > 0:
     #                     for number, url in enumerate(links_to_images):
     #                         if number == 0:
@@ -186,6 +191,6 @@ async def find_hotels(message, data):
     #                     await message.answer(message.chat.id, medias)
     #                 else:
     #                     await message.answer(message.chat.id, caption)
-    #
+    
     # else:
     #     print('Провал(')
